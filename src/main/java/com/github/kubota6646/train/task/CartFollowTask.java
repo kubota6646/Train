@@ -16,14 +16,20 @@ import java.util.UUID;
 /**
  * 連結されたトロッコがリーダーに追従するよう速度を制御するタスク。
  * 2 tick ごとに実行されます。
+ *
+ * <p>スプリングダンパー制御を採用しています。位置誤差（比例項）と
+ * 速度誤差（微分項）の両方を加味することで、振動を抑えた滑らかな追従を実現します。</p>
  */
 public class CartFollowTask extends BukkitRunnable {
 
     /** フォロワーがリーダーに対して維持しようとする目標距離（ブロック） */
     private static final double TARGET_DISTANCE = 2.0;
 
-    /** 速度補正のスケール係数 */
-    private static final double SPEED_SCALE = 0.4;
+    /** 位置誤差に対する比例ゲイン */
+    private static final double KP = 0.25;
+
+    /** 速度誤差に対する微分ゲイン（ダンピング） */
+    private static final double KD = 0.6;
 
     /** 最大補正速度 */
     private static final double MAX_SPEED = 1.0;
@@ -66,28 +72,35 @@ public class CartFollowTask extends BukkitRunnable {
     }
 
     /**
-     * フォロワーカートがリーダーカートを追従するよう速度ベクトルを設定します。
+     * フォロワーカートがリーダーカートをスムーズに追従するよう速度ベクトルを設定します。
+     *
+     * <p>スプリングダンパー制御：</p>
+     * <ul>
+     *   <li>比例項 (KP)：リーダーとの距離が目標からずれているほど強く引き寄せる / 押し返す</li>
+     *   <li>微分項 (KD)：リーダーとの相対速度差を打ち消してオーバーシュートを抑える</li>
+     * </ul>
      */
     private void applyFollowVelocity(Minecart leader, Minecart follower) {
         Vector leaderPos = leader.getLocation().toVector();
         Vector followerPos = follower.getLocation().toVector();
-        Vector toLeader = leaderPos.clone().subtract(followerPos);
-        double distance = toLeader.length();
+        Vector offset = leaderPos.clone().subtract(followerPos);
+        double distance = offset.length();
 
         if (distance < 0.01) return;
 
-        double gap = distance - TARGET_DISTANCE;
+        Vector direction = offset.normalize();
+        double positionError = distance - TARGET_DISTANCE;
 
-        if (gap > 0.3) {
-            // フォロワーがリーダーから離れすぎ → 前進
-            double speed = Math.min(gap * SPEED_SCALE, MAX_SPEED);
-            follower.setVelocity(toLeader.normalize().multiply(speed));
-        } else if (gap < -0.3) {
-            // フォロワーがリーダーに近づきすぎ → 減速または後退
-            double speed = Math.min(-gap * SPEED_SCALE, MAX_SPEED * 0.5);
-            follower.setVelocity(toLeader.normalize().multiply(-speed));
-        }
-        // 目標距離付近では速度を変更しない（レールに任せる）
+        // リーダー・フォロワーの速度を方向軸に投影して相対速度を計算
+        double leaderSpeed = leader.getVelocity().dot(direction);
+        double followerSpeed = follower.getVelocity().dot(direction);
+        double velocityError = leaderSpeed - followerSpeed;
+
+        // スプリングダンパー: 目標速度 = 現在速度 + 位置補正 + 速度ダンピング
+        double targetSpeed = followerSpeed + KP * positionError + KD * velocityError;
+        targetSpeed = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, targetSpeed));
+
+        follower.setVelocity(direction.multiply(targetSpeed));
     }
 
     /**

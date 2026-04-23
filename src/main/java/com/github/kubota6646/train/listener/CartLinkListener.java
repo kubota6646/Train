@@ -53,6 +53,9 @@ public class CartLinkListener implements Listener {
         // チェーンを手に持っているか確認
         if (player.getInventory().getItemInMainHand().getType() != Material.CHAIN) return;
 
+        // チェーンを持っている場合はトロッコへの乗車をキャンセル
+        event.setCancelled(true);
+
         Minecart clicked = (Minecart) event.getRightClicked();
 
         if (player.isSneaking()) {
