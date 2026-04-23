@@ -1,0 +1,18 @@
+name: Train
+version: '${version}'
+main: com.github.kubota6646.train.TrainPlugin
+api-version: '1.21'
+description: トロッコをつなげることができるプラグイン
+authors:
+  - kubota6646
+
+commands:
+  train:
+    description: トロッコを連結・解除するコマンド
+    usage: /train <link|unlink>
+    permission: train.use
+
+permissions:
+  train.use:
+    description: トロッコを連結・解除する権限
+    default: true

@@ -1,0 +1,16 @@
+# Gradle build output
+build/
+.gradle/
+
+# Local dependency jars (not tracked in version control)
+libs/
+
+# IDE files
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# macOS
+.DS_Store
